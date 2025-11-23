@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        p {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+        .status {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(0, 255, 0, 0.2);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✅ TheConverter Test</h1>
+        <p>If you can see this page with purple gradient background, your setup is working!</p>
+        <div class="status">
+            <strong>Frontend:</strong> ✅ Running<br>
+            <strong>Backend:</strong> <span id="backend-status">Checking...</span>
+        </div>
+        <p style="margin-top: 20px;">
+            <a href="/" style="color: white; text-decoration: underline;">Go to Main Application →</a>
+        </p>
+    </div>
+    
+    <script>
+        // Test backend connection
+        fetch('http://localhost:8000/health')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('backend-status').innerHTML = '✅ ' + data.status;
+            })
+            .catch(error => {
+                document.getElementById('backend-status').innerHTML = '❌ Not connected';
+            });
+    </script>
+</body>
+</html>

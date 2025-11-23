@@ -1,0 +1,29 @@
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.production.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Temporary files
+*.log
+*.tmp
+.DS_Store
+.vercel
+
+# API temp files
+api/temp/
