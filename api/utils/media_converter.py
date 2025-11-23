@@ -122,8 +122,16 @@ class MediaConverter:
             stdout, stderr = await process.communicate()
             
             if process.returncode == 0:
-                logger.info(f"Conversion successful: {output_path.name}")
-                return True
+                # Wait a bit for file system sync
+                await asyncio.sleep(0.5)
+                
+                # Verify output file exists
+                if output_path.exists() and output_path.stat().st_size > 0:
+                    logger.info(f"Conversion successful: {output_path.name} ({output_path.stat().st_size} bytes)")
+                    return True
+                else:
+                    logger.error(f"Conversion process succeeded but output file not found: {output_path}")
+                    return False
             else:
                 logger.error(f"Conversion failed: {stderr.decode()}")
                 return False

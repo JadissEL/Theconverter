@@ -62,6 +62,7 @@ class SegmentProcessor:
         self,
         input_path: Path,
         output_dir: Path,
+        input_format: Optional[str] = None,
         progress_callback: Optional[Callable] = None
     ) -> List[Path]:
         """
@@ -90,8 +91,11 @@ class SegmentProcessor:
             
             output_dir.mkdir(parents=True, exist_ok=True)
             
-            # Detect input format
-            input_ext = input_path.suffix.lstrip('.') or 'mp3'
+            # Use provided format or detect from extension
+            if input_format:
+                input_ext = input_format
+            else:
+                input_ext = input_path.suffix.lstrip('.') or 'mp3'
             
             # Split using FFmpeg - use same format as input for copy codec
             segment_pattern = str(output_dir / f"segment_%03d.{input_ext}")
@@ -296,6 +300,7 @@ class SegmentProcessor:
         output_path: Path,
         output_format: str,
         quality: str = 'high',
+        input_format: Optional[str] = None,
         progress_callback: Optional[Callable] = None
     ) -> bool:
         """
@@ -323,7 +328,7 @@ class SegmentProcessor:
                 if progress_callback:
                     await progress_callback(p * 0.2)
             
-            segments = await self.split_into_segments(input_path, temp_dir, split_progress)
+            segments = await self.split_into_segments(input_path, temp_dir, input_format, split_progress)
             
             if not segments:
                 logger.error("Failed to split file into segments")

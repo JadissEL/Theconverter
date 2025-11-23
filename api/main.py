@@ -323,12 +323,14 @@ async def convert_file(
         if use_segmentation:
             logger.info(f"Using segment processing for large file (duration: {file_duration}s, size: {file_size_mb:.1f}MB)")
             
-            # Process using segments
+            # Process using segments - pass detected format for splitting
+            detected_format = detection.get('format', 'mp4')
             success = await segment_processor.process_large_file(
                 input_path=input_path,
                 output_path=output_path,
                 output_format=output_format,
-                quality=quality
+                quality=quality,
+                input_format=detected_format
             )
         else:
             logger.info("Using standard conversion")

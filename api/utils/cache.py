@@ -183,10 +183,12 @@ class ConversionCache:
         cache_filename = f"{cache_key}.{output_format}"
         cached_file = self.cache_dir / cache_filename
         
-        # Copy file to cache
+        # Copy file to cache (use copy instead of rename to preserve original)
+        import shutil
         await asyncio.to_thread(
-            output_file.rename,
-            cached_file
+            shutil.copy2,
+            str(output_file),
+            str(cached_file)
         )
         
         # Create cache entry
