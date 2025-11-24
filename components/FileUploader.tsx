@@ -38,6 +38,7 @@ export default function FileUploader({ onFileUploaded, isConverting }: FileUploa
 
       const fileData: FileData = {
         file,
+        rawFile: file,  // Add raw File object for transcription
         detectedType: response.data.detected_type,
         detectedFormat: response.data.detected_format,
         metadata: response.data.metadata,

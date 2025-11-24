@@ -1,5 +1,6 @@
 export interface FileData {
   file: File;
+  rawFile: File;  // Add raw File object for transcription
   detectedType?: string;
   detectedFormat?: string;
   metadata?: MediaMetadata;

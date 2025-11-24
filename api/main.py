@@ -15,6 +15,8 @@ from utils.logger import setup_logger, log_with_context
 from utils.cache import ConversionCache
 from utils.validator import FileValidator
 from utils.rate_limiter import RateLimiter, RateLimitConfig
+from utils.transcription import get_transcription_engine, TranscriptionResult
+from utils.pdf_generator import generate_transcription_pdf
 from models.schemas import DetectionResponse, ConversionRequest
 
 # Configure logging
@@ -446,6 +448,194 @@ async def clear_cache():
 async def cache_stats():
     """Get cache statistics"""
     return conversion_cache.get_stats()
+
+
+@app.post("/transcribe")
+async def transcribe_audio(
+    file: UploadFile = File(...),
+    num_speakers: Optional[int] = Form(None),
+    language: Optional[str] = Form(None),
+    model_size: str = Form("base"),
+    request: Request = None
+):
+    """
+    Transcribe audio/video file with speaker diarization
+    
+    Args:
+        file: Audio or video file
+        num_speakers: Expected number of speakers (None for auto-detect)
+        language: Language code (None for auto-detect)
+        model_size: Whisper model size (tiny, base, small, medium, large)
+    
+    Returns:
+        JSON with transcription segments and speaker labels
+    """
+    input_path = None
+    
+    try:
+        # Rate limiting
+        client_ip = request.client.host if request else "unknown"
+        if not rate_limiter.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+        
+        # Validate file
+        validation = await file_validator.validate_file(file)
+        if not validation.is_valid:
+            raise HTTPException(status_code=400, detail=validation.error_message)
+        
+        log_with_context(
+            logger, 20, "Transcription started",
+            filename=file.filename,
+            size_bytes=file.size,
+            num_speakers=num_speakers,
+            language=language,
+            model=model_size
+        )
+        
+        # Save uploaded file
+        input_path = TEMP_DIR / f"transcribe_{file.filename}"
+        with open(input_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Get transcription engine
+        engine = get_transcription_engine(model_size=model_size)
+        
+        # Perform transcription
+        result = await engine.transcribe_with_speakers(
+            audio_path=input_path,
+            num_speakers=num_speakers,
+            language=language
+        )
+        
+        log_with_context(
+            logger, 20, "Transcription complete",
+            segments=len(result.segments),
+            speakers=len(result.speakers),
+            duration=result.duration
+        )
+        
+        # Return result as JSON
+        return JSONResponse(content=result.to_dict())
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Transcription error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+    
+    finally:
+        # Cleanup input file
+        if input_path and input_path.exists():
+            try:
+                input_path.unlink()
+            except:
+                pass
+
+
+@app.post("/transcribe/pdf")
+async def generate_transcription_pdf_endpoint(
+    file: UploadFile = File(...),
+    num_speakers: Optional[int] = Form(None),
+    language: Optional[str] = Form(None),
+    model_size: str = Form("base"),
+    speaker_filter: Optional[str] = Form(None),
+    title: str = Form("Interview Transcription"),
+    include_timestamps: bool = Form(True),
+    request: Request = None
+):
+    """
+    Transcribe audio and generate PDF
+    
+    Args:
+        file: Audio or video file
+        num_speakers: Expected number of speakers
+        language: Language code
+        model_size: Whisper model size
+        speaker_filter: Optional speaker to filter (e.g., "Speaker 1")
+        title: PDF title
+        include_timestamps: Include timestamps in PDF
+    
+    Returns:
+        PDF file
+    """
+    input_path = None
+    
+    try:
+        # Rate limiting
+        client_ip = request.client.host if request else "unknown"
+        if not rate_limiter.check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+        
+        # Validate file
+        validation = await file_validator.validate_file(file)
+        if not validation.is_valid:
+            raise HTTPException(status_code=400, detail=validation.error_message)
+        
+        log_with_context(
+            logger, 20, "PDF transcription started",
+            filename=file.filename,
+            speaker_filter=speaker_filter
+        )
+        
+        # Save uploaded file
+        input_path = TEMP_DIR / f"transcribe_pdf_{file.filename}"
+        with open(input_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Get transcription engine
+        engine = get_transcription_engine(model_size=model_size)
+        
+        # Perform transcription
+        result = await engine.transcribe_with_speakers(
+            audio_path=input_path,
+            num_speakers=num_speakers,
+            language=language
+        )
+        
+        # Generate PDF
+        pdf_bytes = generate_transcription_pdf(
+            transcription=result,
+            speaker_filter=speaker_filter,
+            title=title,
+            include_timestamps=include_timestamps
+        )
+        
+        # Determine filename
+        base_name = Path(file.filename).stem
+        if speaker_filter:
+            pdf_filename = f"{base_name}_{speaker_filter.replace(' ', '_')}.pdf"
+        else:
+            pdf_filename = f"{base_name}_transcription.pdf"
+        
+        log_with_context(
+            logger, 20, "PDF generated",
+            filename=pdf_filename,
+            size_bytes=len(pdf_bytes)
+        )
+        
+        # Return PDF
+        return StreamingResponse(
+            iter([pdf_bytes]),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{pdf_filename}"',
+                "Content-Length": str(len(pdf_bytes))
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"PDF generation error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
+    
+    finally:
+        # Cleanup input file
+        if input_path and input_path.exists():
+            try:
+                input_path.unlink()
+            except:
+                pass
 
 
 if __name__ == "__main__":
